@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>GIS Storable Data</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+  <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+  <link rel="stylesheet" href="http://openlayers.org/en/v3.17.1/css/ol.css" type="text/css">
+  <script src="apis/ol.js"></script>
+  <link href="jquery-ui.css" rel="stylesheet">
+  <script src="apis/jquery-ui.js"></script>
+  <style>
+.map {
+  height: 480px;
+  width: 100%;
+  margin-bottom: 10px;
+}
+  </style>
+</head>
+<body>
+
+<div class="container-fluid">
+  <h1>GIS Storable Data</h1>
+  <p>Use the checkboxes to determine which map elements to send to STEPL.</p>
+  <div class="row">
+    <div class="col-sm-4" style="background-color:lavender;">
+      <div class="checkbox">
+        <label><input type="checkbox" value="">Feature 1</label>
+      </div>
+      <div class="checkbox">
+        <label><input type="checkbox" value="">Feature 2</label>
+      </div>
+      <div class="checkbox">
+        <label><input type="checkbox" value="">Feature 3</label>
+      </div>
+    </div>
+    <div class="col-sm-8" style="background-color:lavenderblush;height:100%;">
+      <div id="map" class="map"></div>
+        <script>
+          var features = [];
+          var geoJsonFormat = new ol.format.GeoJSON();
+
+          var image = new ol.style.Circle({
+            radius: 5,
+            fill: null,
+            stroke: new ol.style.Stroke({color: 'red', width: 1})
+          });
+          var styles = {
+            'Point': new ol.style.Style({
+              image: image
+            }),
+            'LineString': new ol.style.Style({
+              stroke: new ol.style.Stroke({
+                color: 'green',
+                width: 1
+              })
+            }),
+            'MultiLineString': new ol.style.Style({
+              stroke: new ol.style.Stroke({
+                color: 'green',
+                width: 1
+              })
+            }),
+            'MultiPoint': new ol.style.Style({
+              image: image
+            }),
+            'MultiPolygon': new ol.style.Style({
+              stroke: new ol.style.Stroke({
+                color: 'yellow',
+                width: 1
+              }),
+              fill: new ol.style.Fill({
+                color: 'rgba(255, 255, 0, 0.1)'
+              })
+            }),
+            'Polygon': new ol.style.Style({
+              stroke: new ol.style.Stroke({
+                color: 'blue',
+                lineDash: [4],
+                width: 3
+              }),
+              fill: new ol.style.Fill({
+                color: 'rgba(0, 0, 255, 0.1)'
+              })
+            }),
+            'GeometryCollection': new ol.style.Style({
+              stroke: new ol.style.Stroke({
+                color: 'magenta',
+                width: 2
+              }),
+              fill: new ol.style.Fill({
+                color: 'magenta'
+              }),
+              image: new ol.style.Circle({
+                radius: 10,
+                fill: null,
+                stroke: new ol.style.Stroke({
+                  color: 'magenta'
+                })
+              })
+            }),
+            'Circle': new ol.style.Style({
+              stroke: new ol.style.Stroke({
+                color: 'red',
+                width: 2
+              }),
+              fill: new ol.style.Fill({
+                color: 'rgba(255,0,0,0.2)'
+              })
+            })
+          };
+
+          var styleFunction = function(feature) {
+            return styles[feature.getGeometry().getType()];
+          };
+
+          var vectorSource = new ol.source.Vector({
+            features: features//().readFeatures(geojsonObject)
+          });
+          var vectorLayer = new ol.layer.Vector({
+            source: vectorSource,
+            style: styleFunction
+          });
+
+
+          // if this is just a coverage or a group of them, disable a few items,
+          // and default to jpeg format
+          var format = 'image/png';
+          var raster = new ol.layer.Tile({
+            source: new ol.source.OSM()
+          });
+          var untiled = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+              ratio: 1,
+              url: 'http://devdw.agriculture.purdue.edu:8080/geoserver/maumee/wms',
+              params: {'FORMAT': format,
+                       'VERSION': '1.1.1',  
+                    LAYERS: 'maumee:watersheds',
+                    STYLES: '',
+              }
+            })
+          });
+
+          var map = new ol.Map({
+            layers: [raster, vectorLayer],
+            target: 'map',
+            view: new ol.View({
+              center: [-11000000, 4600000],
+              zoom: 4
+            })
+          });
+
+          $.getJSON({
+             url: 'http://etheller.com/GeoserverProxy/maumee/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=maumee:watersheds&outputFormat=application%2Fjson',
+             success: function(geoJson) {
+                console.log(geoJson);
+                 features = geoJsonFormat.readFeatures(geoJson, {featureProjection:"EPSG:3857"});
+                 vectorSource.clear();
+                 vectorSource.addFeatures(features);
+                 console.log(features);
+             }
+         });
+        </script>
+    </div>
+  </div>
+</div>
+    
+</body>
+</html>
+

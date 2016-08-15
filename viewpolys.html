@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>GIS Storable Data</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+  <link rel="stylesheet" href="apis/ol.css" type="text/css">
+  <script src="apis/ol.js"></script>
+  <link href="apis/jquery-ui.css" rel="stylesheet">
+  <script src="apis/jquery-ui.js"></script>
+  <style>
+.map {
+  height: 100%;
+  width: 100%;
+  margin-bottom: 10px;
+  position:fixed;
+}
+.checkboxButton {
+  width: 300px;
+}
+#dialog {
+  overflow: "auto";
+}
+  </style>
+</head>
+<body>
+<!-- ui-dialog -->
+<div id="dialog" title="Choose Polygons">
+  <fieldset id="checkboxfields">
+    <legend>Features: </legend>
+  </fieldset>
+</div>
+<div id="map" class="map"></div>
+  <script>
+    // compat for ie8 probably
+    if(!Array.prototype.indexOf) {
+        Array.prototype.indexOf = function(what, i) {
+            i = i || 0;
+            var L = this.length;
+            while (i < L) {
+                if(this[i] === what) return i;
+                ++i;
+            }
+            return -1;
+        };
+    }
+    // end compat
+
+    var features = [];
+    var isFeatureSelected = [];
+    var isMouseOver = [];
+    var geoJsonFormat = new ol.format.GeoJSON();
+
+    var image = new ol.style.Circle({
+      radius: 5,
+      fill: null,
+      stroke: new ol.style.Stroke({color: 'red', width: 1})
+    });
+    var styles = {
+      'included': new ol.style.Style({
+        stroke: new ol.style.Stroke({
+          color: 'blue',
+          width: 3
+        }),
+        fill: new ol.style.Fill({
+          color: 'rgba(0, 0, 255, 0.1)'
+        })
+      }),
+      'excluded': new ol.style.Style({
+        stroke: new ol.style.Stroke({
+          color: 'orange',
+          width: 3
+        }),
+        fill: new ol.style.Fill({
+          color: 'rgba(255, 255, 0, 0.1)'
+        })
+      }),
+      'mouseOver': new ol.style.Style({
+        stroke: new ol.style.Stroke({
+          color: 'rgb(0, 255, 0)',
+          width: 3
+        }),
+        fill: new ol.style.Fill({
+          color: 'rgba(0, 255, 0, 0.1)'
+        })
+      }),
+    };
+
+    var styleFunction = function(feature) {
+      if( isMouseOver[features.indexOf(feature)] ) {
+        return styles.mouseOver;
+      }
+      if( isFeatureSelected[features.indexOf(feature)] ) {
+        return styles.included;
+      }
+      return styles.excluded;
+    };
+
+    var vectorSource = new ol.source.Vector({
+      features: features//().readFeatures(geojsonObject)
+    });
+    var vectorLayer = new ol.layer.Vector({
+      source: vectorSource,
+      style: styleFunction
+    });
+
+
+    // if this is just a coverage or a group of them, disable a few items,
+    // and default to jpeg format
+    var format = 'image/png';
+    var raster = new ol.layer.Tile({
+      source: new ol.source.OSM()
+    });
+    var untiled = new ol.layer.Image({
+      source: new ol.source.ImageWMS({
+        ratio: 1,
+        url: 'http://devdw.agriculture.purdue.edu:8080/geoserver/maumee/wms',
+        params: {'FORMAT': format,
+                 'VERSION': '1.1.1',  
+              LAYERS: 'maumee:watersheds',
+              STYLES: '',
+        }
+      })
+    });
+
+    var map = new ol.Map({
+      layers: [raster, vectorLayer],
+      target: 'map',
+      view: new ol.View({
+        center: [-11000000, 4600000],
+        zoom: 4
+      })
+    });
+
+    $('body').on({
+      click: function() {
+        var id = $(this).attr('featureIndex');
+        isFeatureSelected[id] = $(this).is(':checked');
+        vectorLayer.setStyle(styleFunction);
+      }
+    }, 'input.checkboxButton');
+    $('body').on({
+      mouseenter: function() {
+        var id = $(this).attr('featureIndex');
+        isMouseOver[id] = true;
+        vectorLayer.setStyle(styleFunction);
+      },
+      mouseleave: function() {
+        var id = $(this).attr('featureIndex');
+        isMouseOver[id] = false;
+        vectorLayer.setStyle(styleFunction);
+      }
+    }, 'label.checkboxButton');
+    $.getJSON({
+       url: 'http://etheller.com/GeoserverProxy/maumee/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=maumee:watersheds&outputFormat=application%2Fjson',
+       success: function(geoJson) {
+          console.log(geoJson);
+          features = geoJsonFormat.readFeatures(geoJson, {featureProjection:"EPSG:3857"});
+          vectorSource.clear();
+          vectorSource.addFeatures(features);
+          console.log(features);
+          var checkboxHTML = "";
+          for(var i = 0; i < geoJson.features.length; i++) {
+            checkboxHTML += '<label for="checkbox-'+i+'" class="checkboxButton" featureIndex="'+i+'">'+geoJson.features[i].id+'</label><input type="checkbox" name="checkbox-'+i+'" id="checkbox-'+i+'" class="checkboxButton" featureIndex="'+i+'">';
+            isFeatureSelected[i] = false;
+            isMouseOver[i] = false;
+          }
+          $("#checkboxfields legend").after(checkboxHTML);
+          $( function() {
+            $( "input" ).checkboxradio();
+          } );
+       }
+   });
+  $( function() {
+    $( "input" ).checkboxradio();
+  } );
+
+  $( "#dialog" ).dialog({
+    closeOnEscape: false,
+    autoOpen: true,
+    width: 400,
+    height: 700,
+    buttons: [
+      {
+        text: "Send to STEPL",
+        click: function() {
+          
+        }
+      }
+    ],
+    position: { my: "left center", at: "left center", of: window },
+    open: function(event, ui) {
+        $(".ui-dialog-titlebar-close", ui.dialog | ui).hide();
+    }
+  });
+  </script>
+</div>
+    
+</body>
+</html>
+
