@@ -1,170 +1,663 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <base href="http://lthia.agriculture.purdue.edu/">
-  <title>GIS Storable Data</title>
+  <title>Send to SPEPL</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-  <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-  <link rel="stylesheet" href="http://openlayers.org/en/v3.17.1/css/ol.css" type="text/css">
-  <script src="http://openlayers.org/en/v3.17.1/build/ol.js"></script>
+  <link rel="stylesheet" href="apis/ol.css" type="text/css">
+  <script src="apis/ol-debug.js"></script>
+  <link href="apis/jquery-ui.css" rel="stylesheet">
+  <script src="apis/jquery-ui.js"></script>
+  <link href="apis/bootstrap.min.css" rel="stylesheet">
+  <script src="apis/bootstrap.min.js"></script>
   <style>
 .map {
-  height: 480px;
+  height: 700px;
   width: 100%;
   margin-bottom: 10px;
 }
+.checkboxButton {
+  width: 300px;
+}
+#dialog {
+  overflow: "auto";
+}
+      .ol-popup {
+        position: absolute;
+        background-color: white;
+        -webkit-filter: drop-shadow(0 1px 4px rgba(0,0,0,0.2));
+        filter: drop-shadow(0 1px 4px rgba(0,0,0,0.2));
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #cccccc;
+        bottom: 12px;
+        left: -50px;
+        min-width: 280px;
+      }
+      .ol-popup:after, .ol-popup:before {
+        top: 100%;
+        border: solid transparent;
+        content: " ";
+        height: 0;
+        width: 0;
+        position: absolute;
+        pointer-events: none;
+      }
+      .ol-popup:after {
+        border-top-color: white;
+        border-width: 10px;
+        left: 48px;
+        margin-left: -10px;
+      }
+      .ol-popup:before {
+        border-top-color: #cccccc;
+        border-width: 11px;
+        left: 48px;
+        margin-left: -11px;
+      }
+      .ol-popup-closer {
+        text-decoration: none;
+        position: absolute;
+        top: 2px;
+        right: 8px;
+      }
+      .ol-popup-closer:after {
+        content: "✖";
+      }
+      .checkboxButtonRight.ui-checkboxradio-checked,
+      .checkboxButtonRight.ui-checkboxradio-checked:hover,
+      .checkboxButtonRight.ui-button:active      {
+        border:1px solid #770000;
+        background:#ff0000;
+      }
   </style>
 </head>
 <body>
+<!-- Modal dialog to pick user at startup -->
+  <div class="modal fade" id="myModal" role="dialog">
+    <div class="modal-dialog">
+    
+      <!-- Modal content-->
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4 class="modal-title">Revision</h4>
+        </div>
+        <div class="modal-body">
+            <p>Use this page to view watersheds and areas you have created, send them to the STEPL model, and summarize results.</p>
 
-<div class="container-fluid">
-  <h1>GIS Storable Data</h1>
-  <p>Use the checkboxes to determine which map elements to send to STEPL.</p>
-  <div class="row">
-    <div class="col-sm-4" style="background-color:lavender;">
-      <div class="checkbox">
-        <label><input type="checkbox" value="">Feature 1</label>
+            <form role="form">
+              <div class="form-group">
+                <label class="control-label col-sm-2" for="username">Username:</label>
+                <input type="username" class="form-control" id="username" placeholder="Enter username">
+              </div>
+              <div class="form-group">
+                <label class="control-label col-sm-2" for="classFilter">Class:</label>
+                <select class="form-control" id="classFilter">
+                    <option>Initial</option>
+                    <option>Conversion</option>
+                    <option>Restoration</option>
+                    <option>Enhancement</option>
+                    <option>Riparian</option>
+                    <option>Delineated</option>
+                    <option>ALL</option>
+                </select>
+              </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default"  onclick="return enterMap()">Enter Map</button>
+        </div>
       </div>
-      <div class="checkbox">
-        <label><input type="checkbox" value="">Feature 2</label>
-      </div>
-      <div class="checkbox">
-        <label><input type="checkbox" value="">Feature 3</label>
-      </div>
-    </div>
-    <div class="col-sm-8" style="background-color:lavenderblush;height:100%;">
-      <div id="map" class="map"></div>
-        <script>
-          var features = [];
-          var geoJsonFormat = new ol.format.GeoJSON();
-
-          var image = new ol.style.Circle({
-            radius: 5,
-            fill: null,
-            stroke: new ol.style.Stroke({color: 'red', width: 1})
-          });
-          var styles = {
-            'Point': new ol.style.Style({
-              image: image
-            }),
-            'LineString': new ol.style.Style({
-              stroke: new ol.style.Stroke({
-                color: 'green',
-                width: 1
-              })
-            }),
-            'MultiLineString': new ol.style.Style({
-              stroke: new ol.style.Stroke({
-                color: 'green',
-                width: 1
-              })
-            }),
-            'MultiPoint': new ol.style.Style({
-              image: image
-            }),
-            'MultiPolygon': new ol.style.Style({
-              stroke: new ol.style.Stroke({
-                color: 'yellow',
-                width: 1
-              }),
-              fill: new ol.style.Fill({
-                color: 'rgba(255, 255, 0, 0.1)'
-              })
-            }),
-            'Polygon': new ol.style.Style({
-              stroke: new ol.style.Stroke({
-                color: 'blue',
-                lineDash: [4],
-                width: 3
-              }),
-              fill: new ol.style.Fill({
-                color: 'rgba(0, 0, 255, 0.1)'
-              })
-            }),
-            'GeometryCollection': new ol.style.Style({
-              stroke: new ol.style.Stroke({
-                color: 'magenta',
-                width: 2
-              }),
-              fill: new ol.style.Fill({
-                color: 'magenta'
-              }),
-              image: new ol.style.Circle({
-                radius: 10,
-                fill: null,
-                stroke: new ol.style.Stroke({
-                  color: 'magenta'
-                })
-              })
-            }),
-            'Circle': new ol.style.Style({
-              stroke: new ol.style.Stroke({
-                color: 'red',
-                width: 2
-              }),
-              fill: new ol.style.Fill({
-                color: 'rgba(255,0,0,0.2)'
-              })
-            })
-          };
-
-          var styleFunction = function(feature) {
-            return styles[feature.getGeometry().getType()];
-          };
-
-          var vectorSource = new ol.source.Vector({
-            features: features//().readFeatures(geojsonObject)
-          });
-          var vectorLayer = new ol.layer.Vector({
-            source: vectorSource,
-            style: styleFunction
-          });
-
-
-          // if this is just a coverage or a group of them, disable a few items,
-          // and default to jpeg format
-          var format = 'image/png';
-          var raster = new ol.layer.Tile({
-            source: new ol.source.OSM()
-          });
-          var untiled = new ol.layer.Image({
-            source: new ol.source.ImageWMS({
-              ratio: 1,
-              url: 'http://devdw.agriculture.purdue.edu:8080/geoserver/maumee/wms',
-              params: {'FORMAT': format,
-                       'VERSION': '1.1.1',  
-                    LAYERS: 'maumee:watersheds',
-                    STYLES: '',
-              }
-            })
-          });
-
-          var map = new ol.Map({
-            layers: [raster, vectorLayer],
-            target: 'map',
-            view: new ol.View({
-              center: [-11000000, 4600000],
-              zoom: 4
-            })
-          });
-
-          $.getJSON({
-             url: 'http://etheller.com/GeoserverProxy/maumee/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=maumee:watersheds&outputFormat=application%2Fjson',
-             success: function(geoJson) {
-                console.log(geoJson);
-                 features = geoJsonFormat.readFeatures(geoJson, {featureProjection:"EPSG:3857"});
-                 vectorSource.clear();
-                 vectorSource.addFeatures(features);
-                 console.log(features);
-             }
-         });
-        </script>
+      
     </div>
   </div>
+<!-- ui-dialog on the left -->
+<div id="dialog" title="Run STEPL">
+<fieldset>
+    <legend>Features</legend>
+<form style="margin-top: 1em;" id="checkboxfields">
+	<div id="radioset">
+	</div>
+</form>
+</fieldset>
 </div>
+<!-- ui-dialog on the right -->
+<div id="dialogRight" title="Add up Results">
+<fieldset>
+    <legend>Features</legend>
+<form style="margin-top: 1em;" id="checkboxfieldsRight">
+	<div id="radiosetRight">
+	</div>
+</form>
+</fieldset>
+</div>
+<div class="container" style="width:100%;">
+    <div class="row">
+        <div id="map" class="map"></div>
+        <div id="popup" class="ol-popup">
+          <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+          <div id="popup-content"></div>
+        </div>
+  <script>
+  // jquery extend function
+    $.extend(
+    {
+        redirectPost: function(location, args, loadNewWindow)
+        {
+            var form = $('<form></form>');
+            form.attr("method", "post");
+            form.attr("action", location);
+            if( loadNewWindow ) {
+                form.attr("target", "_blank");
+            }
+
+            $.each( args, function( key, value ) {
+                var field = $('<input></input>');
+
+                field.attr("type", "hidden");
+                field.attr("name", key);
+                field.attr("value", value);
+
+                form.append(field);
+            });
+            $(form).appendTo('body').submit();
+        }
+    });
+    function getParameterByName(name, url) {
+        if (!url) url = window.location.href;
+        name = name.replace(/[\[\]]/g, "\\$&");
+        var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+            results = regex.exec(url);
+        if (!results) return null;
+        if (!results[2]) return '';
+        return decodeURIComponent(results[2].replace(/\+/g, " "));
+    }
+    // compat for ie8 probably
+    if(!Array.prototype.indexOf) {
+        Array.prototype.indexOf = function(what, i) {
+            i = i || 0;
+            var L = this.length;
+            while (i < L) {
+                if(this[i] === what) return i;
+                ++i;
+            }
+            return -1;
+        };
+    }
+    // end compat
+    var features = [];
+    var selectedFeatureIndex;
+    var includeFeatureInTable = [];
+    var includeFeatureInResults = [];
+    var isMouseOver = [];
+    var geoJsonFormat = new ol.format.GeoJSON();
+
+    var image = new ol.style.Circle({
+      radius: 5,
+      fill: null,
+      stroke: new ol.style.Stroke({color: 'blue', width: 1})
+    });
+    var styles = {
+      'Point': new ol.style.Style({
+        image: image
+      }),
+      'included': new ol.style.Style({
+        stroke: new ol.style.Stroke({
+          color: 'blue',
+          width: 3
+        }),
+        fill: new ol.style.Fill({
+          color: 'rgba(0, 0, 255, 0.1)'
+        })
+      }),
+      'excluded': new ol.style.Style({
+        stroke: new ol.style.Stroke({
+          color: 'orange',
+          width: 3
+        }),
+        fill: new ol.style.Fill({
+          color: 'rgba(255, 255, 0, 0.1)'
+        })
+      }),
+      'mouseOver': new ol.style.Style({
+        stroke: new ol.style.Stroke({
+          color: 'rgb(0, 255, 0)',
+          width: 3
+        }),
+        fill: new ol.style.Fill({
+          color: 'rgba(0, 255, 0, 0.1)'
+        })
+      }),
+    };
+    
+    function refreshTableResults() {
+        var totalNLoad = 0, totalPLoad = 0, totalBODLoad = 0, totalSEDLoad = 0, totalNRed = 0, totalPRed = 0, totalBODRed = 0, totalSEDRed = 0;
+        for(var i = 0; i < features.length; i++) {
+            if( includeFeatureInTable[i] && includeFeatureInResults[i] ) {
+                var properties = features[i].getProperties();
+                totalNLoad += properties.N_load;
+                totalPLoad += properties.P_load;
+                totalBODLoad += properties.BOD_load;
+                totalSEDLoad += properties.SED_load;
+                totalNRed += properties.N_red;
+                totalPRed += properties.P_red;
+                totalBODRed += properties.BOD_red;
+                totalSEDRed += properties.SED_red;
+            }
+        }
+        
+        $("#sumRow").html("<tr><td>TOTAL</td><td></td><td>"+totalNLoad.toFixed(2)+"</td><td>"+totalPLoad.toFixed(2)+"</td><td>"+totalBODLoad.toFixed(2)+"</td><td>"+totalSEDLoad.toFixed(2)+"</td><td>"+totalNRed.toFixed(2)+"</td><td>"+totalPRed.toFixed(2)+"</td><td>"+totalBODRed.toFixed(2)+"</td><td>"+totalSEDRed.toFixed(2)+"</td><td></td><td></td></tr>");
+    }
+    function refreshTable() {
+        var tableHTML = "";
+        for(var i = 0; i < features.length; i++) {
+            if( includeFeatureInTable[i] ) {
+                var feature = features[i];
+                var properties = feature.getProperties();
+                tableHTML += "\
+                  <tr"+(properties.STEPL_run?"":" class='danger'")+">\
+                    <td>"+feature.getId()+"</td>\
+                    <td>"+properties.project+"</td>\
+                    <td>"+properties.N_load+"</td>\
+                    <td>"+properties.P_load+"</td>\
+                    <td>"+properties.BOD_load+"</td>\
+                    <td>"+properties.SED_load+"</td>\
+                    <td>"+properties.N_red+"</td>\
+                    <td>"+properties.P_red+"</td>\
+                    <td>"+properties.BOD_red+"</td>\
+                    <td>"+properties.SED_red+"</td>\
+                    <td>"+properties.STEPL_run+"</td>\
+                    <td><input type='checkbox'"+(includeFeatureInResults[i]?"checked":"")+" class='tableIncludeCheckbox' featureIndex="+i+" /></td>\
+                    <td><input type='button' value='Send to STEPL' onclick='sendToSTEPL([features["+i+"]])'></input></td>\
+                  </tr>\n";
+            }
+        }
+        //tableHTML += "</tbody>";
+        $("#resultsTable").html(tableHTML);
+        
+        refreshTableResults();
+    }
+
+    var styleFunction = function(feature) {
+      if( feature.getGeometry().getType() === "Point" ) {
+        return styles.Point;
+      }
+      if( isMouseOver[features.indexOf(feature)] ) {
+        return styles.mouseOver;
+      }
+      if( features.indexOf(feature) == selectedFeatureIndex ) {//isFeatureSelected[features.indexOf(feature)]
+        return styles.included;
+      }
+      return styles.excluded;
+    };
+
+    var vectorSource = new ol.source.Vector({
+      features: features//().readFeatures(geojsonObject)
+    });
+    var vectorLayer = new ol.layer.Vector({
+      source: vectorSource,
+      style: styleFunction
+    });
+
+
+    // if this is just a coverage or a group of them, disable a few items,
+    // and default to jpeg format
+    var format = 'image/png';
+    var raster = new ol.layer.Tile({
+      source: new ol.source.OSM()
+    });
+      var container = document.getElementById('popup');
+      var content = document.getElementById('popup-content');
+      var closer = document.getElementById('popup-closer');
+    /**
+    * Create an overlay to anchor the popup to the map.
+    */
+    var overlay = new ol.Overlay(/** @type {olx.OverlayOptions} */ ({
+    element: container,
+    autoPan: true,
+    autoPanAnimation: {
+      duration: 250
+    }
+    }));
+      /**
+       * Add a click handler to hide the popup.
+       * @return {boolean} Don't follow the href.
+       */
+      closer.onclick = function() {
+        overlay.setPosition(undefined);
+        closer.blur();
+        return false;
+      };
+
+    var map = new ol.Map({
+        layers: [raster, vectorLayer],
+        overlays: [overlay],
+        target: 'map',
+        view: new ol.View({
+            center: [-11000000, 4600000],
+            zoom: 4
+        })
+    });
+    //var selectInteraction = new ol.interaction.Select();
+    //map.addInteraction(selectInteraction);
+    //var foreverEvent;
+    //selectInteraction.on('select', function(event) {
+    //    if( event.target.getFeatures().getLength() > 0 ) {
+    //        foreverEvent = event;
+    //        var feature = event.target.getFeatures().getArray()[0];
+            //display your message here
+    //    }
+    //  }
+    //);
+    map.on("click", function(e) {
+        map.forEachFeatureAtPixel(e.pixel, function (feature, layer) {
+            var center;
+            var properties;
+            if( feature.getGeometry().getType() === "Point" ) {
+                center = feature.getGeometry().getCoordinates();
+                properties = feature.steplInfoParentFeature.getProperties();
+            } else {
+                center = feature.getGeometry().getInteriorPoint().getCoordinates();
+                properties = feature.getProperties();
+            }
+            content.innerHTML = '<p>You clicked on a feature.</p><code>';
+            var keyArray = ["session_id", "mainuser", "project", "allrunoff", "rounits", "npsunits", "ecunits", "county", "state", "huc_12code"]; // feature.getKeys() for them all
+            for(var i = 0; i < keyArray.length; i++) {
+                var key = keyArray[i];
+                content.innerHTML += "<br><strong>"+key+": </strong> " + properties[key];
+            }
+            content.innerHTML += '</code>';
+            overlay.setPosition(center);
+        });
+    });
+
+    $('body').on({
+      click: function() {
+        var id = $(this).attr('featureIndex');
+        includeFeatureInResults[id] = $(this).is(':checked');
+        if( includeFeatureInResults[id] && !features[id].getProperties().STEPL_run ) {
+            alert("You have chosen to include a feature in your total that does not have results from the STEPL model yet! You should run it with the controls in the 'Run STEPL' dialog.");
+        }
+        refreshTableResults();
+      }
+    }, 'input.tableIncludeCheckbox');
+
+    $('#dialog').on({
+      click: function() {
+        var id = $(this).attr('featureIndex');
+        /*isFeatureSelected[id] = $(this).is(':checked');
+        if( isFeatureSelected[id] ) {
+            vectorSource.addFeature(features[id]);
+        } else {
+            vectorSource.removeFeature(features[id]);
+        }*/
+        if( id !== selectedFeatureIndex || selectedFeatureIndex == null ) {
+            if( selectedFeatureIndex != null ) {
+                vectorSource.removeFeature(features[selectedFeatureIndex]);
+            }
+            selectedFeatureIndex = id;
+            vectorSource.addFeature(features[selectedFeatureIndex]);
+        }
+        vectorLayer.setStyle(styleFunction);
+      }
+    }, 'input.checkboxButtonLeft');//tableIncludeCheckbox
+
+    $('#dialogRight').on({
+      click: function() {
+        var id = $(this).attr('featureIndex');
+        includeFeatureInTable[id] = $(this).is(':checked');
+        /*if( includeFeatureInTable[id] ) {
+            vectorSource.addFeature(features[id]);
+        } else {
+            vectorSource.removeFeature(features[id]);
+        }
+        vectorLayer.setStyle(styleFunction);*/
+        refreshTable();
+      }
+    }, 'input.checkboxButtonRight');
+    $('body').on({
+      mouseenter: function() {
+        var id = $(this).attr('featureIndex');
+        isMouseOver[id] = true;
+        vectorLayer.setStyle(styleFunction);
+        if( id != selectedFeatureIndex ) {//!isFeatureSelected[id] ) {
+            vectorSource.addFeature(features[id]);
+        }
+      },
+      mouseleave: function() {
+        var id = $(this).attr('featureIndex');
+        isMouseOver[id] = false;
+        vectorLayer.setStyle(styleFunction);
+        
+        if( id != selectedFeatureIndex ) {//!isFeatureSelected[id] ) {
+            vectorSource.removeFeature(features[id]);
+        }
+      }
+    }, 'label.checkboxButton');
+    var user;// = getParameterByName('username');
+    var classField;// = getParameterByName('class');
+    function enterMap() {
+        user = document.getElementById("username").value;
+        classField = document.getElementById("classFilter").value;
+        var url;
+        if( classField === "ALL" ) {
+            url = 'http://etheller.com/GeoserverProxy/wetlands/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=wetlands:steplpoly&outputFormat=application%2Fjson&FILTER=<PropertyIsEqualTo><PropertyName>mainuser</PropertyName><Literal>'+user+'</Literal></PropertyIsEqualTo>'
+        } else {
+            url = 'http://etheller.com/GeoserverProxy/wetlands/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=wetlands:steplpoly&outputFormat=application%2Fjson&FILTER=<And><PropertyIsEqualTo><PropertyName>mainuser</PropertyName><Literal>'+user+'</Literal></PropertyIsEqualTo><PropertyIsEqualTo><PropertyName>bmpclass</PropertyName><Literal>'+classField+'</Literal></PropertyIsEqualTo></And>';
+        }
+        console.log(url);
+        if( user != null ) {
+            $.getJSON({
+               url: url,
+               success: function(geoJson) {
+                  console.log(geoJson);
+                  features = geoJsonFormat.readFeatures(geoJson, {featureProjection:"EPSG:3857"});
+                  vectorSource.clear();
+                  //vectorSource.addFeatures(features);
+                  var radioHTML = "";
+                  var checkboxHTML = "";
+                  for(var i = 0; i < geoJson.features.length; i++) {
+                    checkboxHTML += '<label for="checkbox-'+i+'" class="checkboxButton checkboxButtonRight" featureIndex="'+i+'">'+geoJson.features[i].id+'</label><input type="checkbox" name="checkbox-'+i+'" id="checkbox-'+i+'" class="checkboxButton checkboxButtonRight" featureIndex="'+i+'">';
+                    radioHTML += '<input type="radio" id="radio'+i+'" name="radio" class="checkboxButton checkboxButtonLeft" featureIndex="'+i+'"><label for="radio'+i+'" class="checkboxButton checkboxButtonLeft" featureIndex="'+i+'">'+geoJson.features[i].id+'</label>';//<label for="checkbox-'+i+'" class="checkboxButton" featureIndex="'+i+'">'+geoJson.features[i].id+'</label><input type="radio" name="checkbox-'+i+'" id="checkbox-'+i+'" class="checkboxButton" featureIndex="'+i+'">';
+                    //isFeatureSelected[i] = false;
+                    isMouseOver[i] = false;
+                    var interiorPoint = features[i].getGeometry().getInteriorPoint().getCoordinates();
+                    var point = new ol.geom.Point(interiorPoint);
+                    var pointFeature = new ol.Feature({
+                        geometry: point
+                    });
+                    pointFeature.steplInfoParentFeature = features[i];
+                    vectorSource.addFeature(pointFeature);
+                  }
+                  selectedFeatureIndex = null;
+                  $("#radiosetRight").html(checkboxHTML);
+                  $( function() {
+                    $( "input.checkboxButtonRight" ).checkboxradio();
+                  } );
+                  $("#radioset").html(radioHTML);
+                  $( function() {
+                    $( "#radioset" ).buttonset();
+                  } );
+                  
+               }
+            });
+        }
+        $("#myModal").modal('hide');
+        return false;
+    }
+    function sendToSTEPL(featureArray) {
+        var soilToLanduseToAcreSum = []
+        var firstCountyEncountered;
+        var firstStateEncountered;
+        var allSameCounty = true;
+        var allSameState = true;
+        var hasCachedPreviousRun = false;
+        for(var featureIndex = 0; featureIndex < featureArray.length; featureIndex++) {
+            var feature = featureArray[featureIndex];
+            var county = feature.getProperties()["county"];
+            var state = feature.getProperties()["state"];
+            if( !firstCountyEncountered ) {
+                firstCountyEncountered = county;
+            }
+            if( firstCountyEncountered != county ) {
+                allSameCounty = false;
+            }
+            if( !firstStateEncountered ) {
+                firstStateEncountered = state;
+            }
+            if( firstStateEncountered != state ) {
+                allSameState = false;
+            }
+            if( feature.getProperties()["STEPL_run"] !== false ) {
+                hasCachedPreviousRun = true;
+            }
+            for(var soilIndex = 1; soilIndex <= 4; soilIndex++) {
+                for(var landuseIndex = 1; landuseIndex <= 7; landuseIndex++) {
+                    var landuseToAcresSum = soilToLanduseToAcreSum[soilIndex-1];
+                    if( !landuseToAcresSum ) {
+                        landuseToAcresSum = [];
+                        soilToLanduseToAcreSum[soilIndex-1] = landuseToAcresSum;
+                    }
+                    if( !landuseToAcresSum[landuseIndex-1] ) {
+                        landuseToAcresSum[landuseIndex-1] = 0;
+                    }
+                    landuseToAcresSum[landuseIndex-1] += feature.getProperties()["acres_"+landuseIndex+"0"+soilIndex];
+                }
+            }
+        }
+        if( !allSameCounty ) {
+            alert("You picked polygons on the map that are in differing counties, but STEPL only accepts one county for each run. We have made a guess that you are working in " + firstCountyEncountered + " and it will be applied to all polygons used in this STPEL run.");
+        }
+        if( !allSameCounty ) {
+            alert("You picked polygons on the map that are in differing states, but STEPL only accepts one state for each run. We have made a guess that you are working in " + firstStateEncountered + " and it will be applied to all polygons used in this STPEL run.");
+        }
+        if( hasCachedPreviousRun ) {
+            var result = confirm("There is already stored data from a previous STEPL run for at least one of the polygons you chose. Since new runs might use different states, counties, or other inputs, running the model means you will destroy previous data by overwriting it. Do you wish to continue and overwrite?");
+            if( !result ) {
+                return;
+            }
+        }
+        var soilNameIds = "ABCD";
+        var soilsAsString = "";
+        var allOfTheDataInAGiantString = "";
+        var numberOfSoilTypes = 0;
+        var landuseToAreaSum = [];
+        var soilAcresAsString = "";
+        for(var soilIndex = 1; soilIndex <= 4; soilIndex++) {
+            var soilName = soilNameIds[soilIndex-1];
+            var totalAreaThisSoil = 0;
+            var landuseAcresForThisSoil = "";
+            // This is for the test version, and it has 7 land uses
+            for(var landuseIndex = 1; landuseIndex <= 7; landuseIndex++) {
+                var acres = soilToLanduseToAcreSum[soilIndex-1][landuseIndex-1];
+                if( landuseAcresForThisSoil.length > 0 ) {
+                    landuseAcresForThisSoil += " ";
+                }
+                landuseAcresForThisSoil += acres;
+                totalAreaThisSoil += acres;
+                if( !landuseToAreaSum[landuseIndex-1] ) {
+                    landuseToAreaSum[landuseIndex-1] = 0;
+                }
+                landuseToAreaSum[landuseIndex-1] += acres;
+            }
+            landuseAcresForThisSoil += " 0"; // we always send an 8th value of 0 for no reason, doesn't work without it
+            if( totalAreaThisSoil > 0 ) {
+                numberOfSoilTypes++;
+                if( soilsAsString.length > 0 ) {
+                    soilsAsString += " ";
+                }
+                soilsAsString += soilName;
+                if( allOfTheDataInAGiantString.length > 0 ) {
+                    allOfTheDataInAGiantString += " ";
+                }
+                allOfTheDataInAGiantString += landuseAcresForThisSoil;
+                if( soilAcresAsString.length > 0 ) {
+                    soilAcresAsString += " ";
+                }
+                soilAcresAsString += totalAreaThisSoil;
+            }
+        }
+        var landuseToAreaSumString = "";
+        for(var i = 0; i < landuseToAreaSum.length; i++) {
+            if( landuseToAreaSumString.length > 0 ) {
+                landuseToAreaSumString += " ";
+            }
+            landuseToAreaSumString += landuseToAreaSum[i];
+        }
+        $.redirectPost("http://etheller.com/GeoserverProxy/stepl", {//https://engineering.purdue.edu/mapserve/ldctest/STEPL/inputMain_import.cgi
+            numGLY: 0,
+            numWSD: numberOfSoilTypes,
+            numSTR: 0,
+            land_list: allOfTheDataInAGiantString,
+            soil_list: soilsAsString,
+            area_sum: soilAcresAsString,
+            luselist: landuseToAreaSumString,
+            state: firstStateEncountered,
+            county: firstCountyEncountered
+        }, true);
+    }
+  $( "#dialog" ).dialog({
+    closeOnEscape: false,
+    autoOpen: true,
+    width: 400,
+    height: 600,
+    buttons: [
+      {
+        text: "Send to STEPL",
+        click: function() {
+            sendToSTEPL([features[selectedFeatureIndex]]);
+        }
+      }
+    ],
+    position: { my: "left top", at: "left top", of: window },
+    open: function(event, ui) {
+        $(".ui-dialog-titlebar-close", ui.dialog | ui).hide();
+    }
+  });
+  $( "#dialogRight" ).dialog({
+    closeOnEscape: false,
+    autoOpen: true,
+    width: 400,
+    height: 600,
+    buttons: [],
+    position: { my: "right top", at: "right top", of: window },
+    open: function(event, ui) {
+        $(".ui-dialog-titlebar-close", ui.dialog | ui).hide();
+    }
+  });
+  $("#myModal").modal();
+  </script>
+    </div>
+    <div class="row">
+        <h2>Results Summary</h2>
+        <p>The output data from STEPL summarizing the polygons you added to the table from the checkboxes on the right side of the page.</p>            
+        <table class="table table-bordered table-hover">
+            <thead>    
+            <tr>                        
+                <th>Feature ID</th>
+                <th>Project</th>
+                <th>N load</th>
+                <th>P load</th>
+                <th>BOD load</th>
+                <th>SED load</th>
+                <th>N reduced</th>
+                <th>P reduced</th>
+                <th>BOD reduced</th>
+                <th>SED reduced</th>
+                <th>Has STEPL run</th>
+                <th>Add to Total?</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="resultsTable">
+            </tbody>
+            <tbody id="sumRow">
+            </tbody>
+        </table>
+        </div>
+    </div>
     
 </body>
 </html>
